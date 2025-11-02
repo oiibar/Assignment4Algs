@@ -1,5 +1,7 @@
 package org.example.graph.dagsp;
 import org.example.graph.common.Edge;
+import org.example.metrics.DAGSPMetrics;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,15 +47,20 @@ public class DagEdgeWeighted {
         return order;
     }
 
-    public static ShortestResult shortest(int C, List<List<Edge>> adj, int source) {
+    public static ShortestResult shortest(int C, List<List<Edge>> adj, int source, DAGSPMetrics m) {
+        m.reset();
+        long start = System.nanoTime();
+
         List<Integer> topo = topoOrder(C, adj);
         double[] dist = new double[C];
         int[] prev = new int[C];
         for (int i = 0; i < C; i++) { dist[i] = Double.POSITIVE_INFINITY; prev[i] = -1; }
         dist[source] = 0.0;
+
         for (int u : topo) {
             if (Double.isInfinite(dist[u])) continue;
             for (Edge e : adj.get(u)) {
+                m.relaxations++;             // instrumentation
                 int v = e.v; double w = e.w;
                 if (dist[v] > dist[u] + w) {
                     dist[v] = dist[u] + w;
@@ -61,10 +68,16 @@ public class DagEdgeWeighted {
                 }
             }
         }
+
+        m.timeNano = System.nanoTime() - start;
         return new ShortestResult(dist, prev, topo);
     }
 
-    public static LongestResult longest(int C, List<List<Edge>> adj) {
+
+    public static LongestResult longest(int C, List<List<Edge>> adj, DAGSPMetrics m) {
+        m.reset();
+        long start = System.nanoTime();
+
         List<Integer> topo = topoOrder(C, adj);
         double[] dist = new double[C];
         int[] prev = new int[C];
@@ -76,6 +89,7 @@ public class DagEdgeWeighted {
         for (int u : topo) {
             if (Double.isInfinite(dist[u]) && dist[u] < 0) continue; // unreachable
             for (Edge e : adj.get(u)) {
+                m.relaxations++;          // instrumentation
                 int v = e.v; double w = e.w;
                 if (dist[v] < dist[u] + w) {
                     dist[v] = dist[u] + w;
@@ -85,8 +99,11 @@ public class DagEdgeWeighted {
         }
         double max = Double.NEGATIVE_INFINITY; int midx = -1;
         for (int i = 0; i < C; i++) if (dist[i] > max) { max = dist[i]; midx = i; }
+
+        m.timeNano = System.nanoTime() - start;
         return new LongestResult(dist, prev, midx, max, topo);
     }
+
 
     public static List<Integer> reconstructPath(int[] prev, int target) {
         if (target < 0) return Collections.emptyList();
